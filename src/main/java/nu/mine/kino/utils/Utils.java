@@ -13,9 +13,9 @@
 package nu.mine.kino.utils;
 
 import static nu.mine.kino.Constants.*;
+import static nu.mine.kino.utils.JSONUtils.getRSAKey;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
@@ -306,10 +306,7 @@ public class Utils {
             // ちなみにAuthleteは
             // https://[サーバ名]/api/jwks
             // だがデフォルトだとかえんないっぽい。設定しないとかな。
-
-            JWKSet publicKeys = JWKSet.load(new URL(jwks_uri));
-            JWK key = publicKeys.getKeyByKeyId(keyID);
-            RSAKey rsaKey = RSAKey.parse(key.toJSONObject());
+            RSAKey rsaKey = getRSAKey(jwks_uri, keyID);
             JWSVerifier verifier = new RSASSAVerifier(rsaKey);
             boolean verify = decodeObject.verify(verifier);
             log.debug("valid? :{}", verify);

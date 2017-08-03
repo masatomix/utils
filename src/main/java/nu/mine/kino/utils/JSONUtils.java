@@ -13,7 +13,6 @@
 package nu.mine.kino.utils;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.ParseException;
 import java.util.Map;
@@ -22,7 +21,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
 
 /**
  * @author Masatomi KINO
@@ -50,7 +51,8 @@ public class JSONUtils {
         return mapper.writeValueAsString(obj);
     }
 
-    public static JWKSet getJWK(String url) throws IOException, ParseException {
+    public static JWKSet getJWKSet(String url)
+            throws IOException, ParseException {
         // HTTP connect timeout in milliseconds
         int connectTimeout = 100;
 
@@ -65,6 +67,14 @@ public class JSONUtils {
                 readTimeout, sizeLimit);
         return publicKeys;
 
+    }
+
+    public static RSAKey getRSAKey(String url, String keyID)
+            throws IOException, ParseException {
+        JWKSet publicKeys = getJWKSet(url);
+        JWK key = publicKeys.getKeyByKeyId(keyID);
+        RSAKey rsaKey = RSAKey.parse(key.toJSONObject());
+        return rsaKey;
     }
 
 }
