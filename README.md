@@ -3,6 +3,7 @@ OAuth 2.0 / OpenID Connect のクライアント側の共通処理をまとめ�
 Yahoo! ID連携 v2 https://developer.yahoo.co.jp/yconnect/v2/
 Google's OAuth 2.0 APIs https://developers.google.com/identity/protocols/OpenIDConnect
 GitHub's OAuth https://developer.github.com/apps/building-integrations/setting-up-and-registering-oauth-apps/
+Authlete による自前実装
 
 
 などで確認。
@@ -11,3 +12,4 @@ GitHub's OAuth https://developer.github.com/apps/building-integrations/setting-u
 ちなみにこれらのサイトの OpenID Connect Discovery はこちら。
 https://accounts.google.com/.well-known/openid-configuration
 https://auth.login.yahoo.co.jp/yconnect/v2/.well-known/openid-configuration
+https://wwwaws2.masatom.in:4430/.well-known/openid-configuration
