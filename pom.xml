@@ -3,8 +3,28 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>nu.mine.kino</groupId>
 	<artifactId>utils</artifactId>
-	<version>0.1.1</version>
-
+	<version>0.1.2</version>
+	<name>Utility</name>
+	<url>https://github.com/masatomix/utils</url>
+	<licenses>
+		<license>
+			<name>The Apache Software License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+		</license>
+	</licenses>
+	<developers>
+		<developer>
+			<email>masatomix@ki-no.org</email>
+			<name>Masatomi KINO</name>
+			<url>https://github.com/masatomix</url>
+			<id>masatomix</id>
+		</developer>
+	</developers>
+	<scm>
+		<url>https://github.com/masatomix/utils</url>
+		<connection>scm:git:https://github.com/masatomix/utils.git</connection>
+		<developerConnection>scm:git:https://github.com/masatomix/utils.git</developerConnection>
+	</scm>
 	<distributionManagement>
 		<repository>
 			<id>internal.repo</id>
@@ -12,7 +32,6 @@
 			<url>file://${project.build.directory}/repository</url>
 		</repository>
 	</distributionManagement>
-
 	<properties>
 		<github.global.server>github</github.global.server>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -23,7 +42,6 @@
 		<maven.war.plugin.version>3.1.0</maven.war.plugin.version>
 		<lombok.version>1.16.2</lombok.version>
 	</properties>
-
 	<dependencies>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -48,13 +66,11 @@
 			<artifactId>jersey-apache-connector</artifactId>
 			<version>${jersey.version}</version>
 		</dependency>
-
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
 			<version>1.7.18</version>
 		</dependency>
-
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-lang3</artifactId>
@@ -65,7 +81,6 @@
 			<artifactId>commons-codec</artifactId>
 			<version>1.10</version>
 		</dependency>
-
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-databind</artifactId>
@@ -76,9 +91,22 @@
 			<artifactId>jackson-annotations</artifactId>
 			<version>2.7.4</version>
 		</dependency>
-
+		<dependency>
+			<groupId>com.nimbusds</groupId>
+			<artifactId>nimbus-jose-jwt</artifactId>
+			<version>4.23</version>
+		</dependency>
 	</dependencies>
-
+	<repositories>
+		<repository>
+			<snapshots>
+				<enabled>true</enabled>
+				<updatePolicy>always</updatePolicy>
+			</snapshots>
+			<id>my-maven-repo</id>
+			<url>https://raw.github.com/masatomix/maven-repo/maven-repo/</url>
+		</repository>
+	</repositories>
 	<build>
 		<plugins>
 			<plugin>
@@ -154,8 +182,6 @@
 					</execution>
 				</executions>
 			</plugin>
-
-
 			<plugin>
 				<groupId>com.amashchenko.maven.plugin</groupId>
 				<artifactId>gitflow-maven-plugin</artifactId>
@@ -167,5 +193,4 @@
 			</plugin>
 		</plugins>
 	</build>
-
 </project>

@@ -13,19 +13,25 @@
 package nu.mine.kino.utils;
 
 import java.io.IOException;
+import java.net.URL;
+import java.text.ParseException;
 import java.util.Map;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.nimbusds.jose.jwk.JWK;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
 
 /**
  * @author Masatomi KINO
  * @version $Revision$
  */
 public class JSONUtils {
-    public static Map<String, Object> json2Map(String result) throws IOException {
+    public static Map<String, Object> json2Map(String result)
+            throws IOException {
         ObjectMapper mapper = new ObjectMapper();
         return mapper.readValue(result,
                 new TypeReference<Map<String, Object>>() {
@@ -44,4 +50,31 @@ public class JSONUtils {
         ObjectMapper mapper = new ObjectMapper();
         return mapper.writeValueAsString(obj);
     }
+
+    public static JWKSet getJWKSet(String url)
+            throws IOException, ParseException {
+        // HTTP connect timeout in milliseconds
+        int connectTimeout = 100;
+
+        // HTTP read timeout in milliseconds
+        int readTimeout = 100;
+
+        // JWK set size limit, in bytes
+        int sizeLimit = 10000;
+
+        // The URL
+        JWKSet publicKeys = JWKSet.load(new URL(url), connectTimeout,
+                readTimeout, sizeLimit);
+        return publicKeys;
+
+    }
+
+    public static RSAKey getRSAKey(String url, String keyID)
+            throws IOException, ParseException {
+        JWKSet publicKeys = getJWKSet(url);
+        JWK key = publicKeys.getKeyByKeyId(keyID);
+        RSAKey rsaKey = RSAKey.parse(key.toJSONObject());
+        return rsaKey;
+    }
+
 }
