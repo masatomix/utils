@@ -30,6 +30,13 @@ import com.nimbusds.jose.jwk.RSAKey;
  * @version $Revision$
  */
 public class JSONUtils {
+
+    public static <T> T json2Obj(String result, Class<T> clazz)
+            throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.readValue(result, clazz);
+    }
+
     public static Map<String, Object> json2Map(String result)
             throws IOException {
         ObjectMapper mapper = new ObjectMapper();
@@ -42,7 +49,6 @@ public class JSONUtils {
             throws JsonProcessingException {
         ObjectMapper mapper = new ObjectMapper()
                 .enable(SerializationFeature.INDENT_OUTPUT);
-
         return mapper.writeValueAsString(obj);
     }
 
@@ -54,10 +60,10 @@ public class JSONUtils {
     public static JWKSet getJWKSet(String url)
             throws IOException, ParseException {
         // HTTP connect timeout in milliseconds
-        int connectTimeout = 100;
+        int connectTimeout = 1000;
 
         // HTTP read timeout in milliseconds
-        int readTimeout = 100;
+        int readTimeout = 1000;
 
         // JWK set size limit, in bytes
         int sizeLimit = 10000;

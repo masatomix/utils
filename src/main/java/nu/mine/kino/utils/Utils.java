@@ -12,11 +12,11 @@
 
 package nu.mine.kino.utils;
 
-import static nu.mine.kino.Constants.*;
+import static nu.mine.kino.Constants.PARAM_STATE;
+import static nu.mine.kino.Constants.SESSION_STATE;
 import static nu.mine.kino.utils.JSONUtils.getRSAKey;
 
 import java.io.IOException;
-import java.net.URL;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -49,10 +49,10 @@ import org.glassfish.jersey.apache.connector.ApacheConnectorProvider;
 import org.glassfish.jersey.client.ClientConfig;
 
 import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSVerifier;
+import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
-import com.nimbusds.jose.jwk.JWK;
-import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
@@ -270,8 +270,8 @@ public class Utils {
         };
     }
 
-    public static boolean checkIdToken(String id_token, String jwks_uri)
-            throws ServletException {
+    public static boolean checkIdToken(String id_token, String jwks_uri,
+            String secret) throws ServletException {
         // String[] id_token_parts = id_token.split("\\.");
         //
         // String ID_TOKEN_HEADER = base64DecodeStr(id_token_parts[0]);
@@ -281,6 +281,7 @@ public class Utils {
         // log.debug("ID_TOKEN_HEADER: {}", ID_TOKEN_HEADER);
         // log.debug("ID_TOKEN_PAYLOAD: {}", ID_TOKEN_PAYLOAD);
         // // log.debug("ID_TOKEN_SIGNATURE: {}", ID_TOKEN_SIGNATURE);
+        boolean verify = false;
 
         try {
             // JWTの仕様に基づいて、デコードしてみる。
@@ -289,28 +290,41 @@ public class Utils {
             log.debug("Payload: " + decodeObject.getPayload());
             log.debug("Sign   : " + decodeObject.getSignature());
 
+            JWSAlgorithm algorithm = decodeObject.getHeader().getAlgorithm();
             JWTClaimsSet set = decodeObject.getJWTClaimsSet();
-            log.debug("{}", set.getSubject());
-            log.debug("{}", set.getIssuer());
-            log.debug("{}", set.getAudience());
-            log.debug("{}", set.getClaim("nonce"));
-            log.debug("{}", new Date().before(set.getExpirationTime()));
+            log.debug("Algorithm: {}", algorithm.getName());
+            log.debug("Subject: {}", set.getSubject());
+            log.debug("Issuer: {}", set.getIssuer());
+            log.debug("Audience: {}", set.getAudience());
+            log.debug("Nonce: {}", set.getClaim("nonce"));
+            log.debug("now before ExpirationTime?: {}",
+                    new Date().before(set.getExpirationTime()));
 
-            // Headerから KeyIDを取得して、
-            String keyID = decodeObject.getHeader().getKeyID();
-            log.debug("{}", keyID);
+            if (algorithm.getName().startsWith("HS")) {
+                log.debug("共通鍵({})", algorithm.getName());
+                byte[] sharedSecret = secret.getBytes(); // バイト列に変換
+                JWSVerifier verifier = new MACVerifier(sharedSecret);
+                verify = decodeObject.verify(verifier);
+                log.debug("valid？: {}", verify);
+                return verify;
+            } else {
+                log.debug("公開鍵({})", algorithm.getName());
+                // Headerから KeyIDを取得して、
+                String keyID = decodeObject.getHeader().getKeyID();
+                log.debug("KeyID: {}", keyID);
 
-            // ちなみにGoogleは
-            // http://qiita.com/trysmr/items/e8d4225ff6a603e9e21a によると
-            // https://www.googleapis.com/oauth2/v3/certs
-            // ちなみにAuthleteは
-            // https://[サーバ名]/api/jwks
-            // だがデフォルトだとかえんないっぽい。設定しないとかな。
-            RSAKey rsaKey = getRSAKey(jwks_uri, keyID);
-            JWSVerifier verifier = new RSASSAVerifier(rsaKey);
-            boolean verify = decodeObject.verify(verifier);
-            log.debug("valid? :{}", verify);
-            return verify;
+                // ちなみにGoogleは
+                // http://qiita.com/trysmr/items/e8d4225ff6a603e9e21a によると
+                // https://www.googleapis.com/oauth2/v3/certs
+                // ちなみにAuthleteは
+                // https://[サーバ名]/api/jwks
+                // だがデフォルトだとかえんないっぽい。設定しないとかな。
+                RSAKey rsaKey = getRSAKey(jwks_uri, keyID);
+                JWSVerifier verifier = new RSASSAVerifier(rsaKey);
+                verify = decodeObject.verify(verifier);
+                log.debug("valid？: {}", verify);
+                return verify;
+            }
 
         } catch (ParseException e) {
             log.warn("サーバの公開鍵の取得に失敗しています.{}", e.getMessage());
