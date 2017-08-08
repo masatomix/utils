@@ -24,6 +24,8 @@ import java.security.cert.X509Certificate;
 import java.text.ParseException;
 import java.util.Date;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
@@ -158,10 +160,36 @@ public class Utils {
         // }
     }
 
+    public static String getAccessToken_JSON_APPLICATION_JSON_TYPE(
+            String oauth_server, String redirect_url, String client_id,
+            String client_secret, String authorizationCode, Client client)
+            throws ServletException {
+        String result = null;
+        String grant_type = "authorization_code";
+
+        Map<String, String> formParams = new HashMap<String, String>();
+        formParams.put("client_secret", client_secret);
+        formParams.put("client_id", client_id);
+        formParams.put("grant_type", grant_type);
+        formParams.put("redirect_uri", redirect_url);
+        formParams.put("code", authorizationCode);
+        log.debug("OAuthServer:{}", oauth_server);
+        Response restResponse = client //
+                .target(oauth_server) //
+                .request(MediaType.APPLICATION_JSON_TYPE).post(Entity
+                        .entity(formParams, MediaType.APPLICATION_JSON_TYPE));
+        result = restResponse.readEntity(String.class);
+        log.debug(result);
+        checkAccessTokenResult(restResponse);
+
+        return result;
+
+    }
+
     public static String getAccessTokenJSON(String oauth_server,
             String redirect_url, String client_id, String client_secret,
             String authorizationCode, Client client, MediaType mediaType)
-                    throws ServletException {
+            throws ServletException {
         String result = null;
         String grant_type = "authorization_code";
         MultivaluedMap<String, String> formParams = new MultivaluedHashMap<String, String>();
@@ -177,24 +205,20 @@ public class Utils {
         // formParams.put("grant_type", grant_type);
         // formParams.put("redirect_uri", redirect_url);
         // formParams.put("code", authorizationCode);
-        try {
-            log.debug("OAuthServer:{}", oauth_server);
-            Response restResponse = client //
-                    .target(oauth_server) //
-                    .request(MediaType.APPLICATION_JSON_TYPE)
-                    .post(Entity.entity(formParams, mediaType));
-            // .post(Entity.entity(formParams,
-            // MediaType.APPLICATION_FORM_URLENCODED_TYPE));
-            // .post(Entity.entity(formParams,
-            // MediaType.APPLICATION_JSON_TYPE));
+        log.debug("OAuthServer:{}", oauth_server);
+        Response restResponse = client //
+                .target(oauth_server) //
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .post(Entity.entity(formParams, mediaType));
+        // .post(Entity.entity(formParams,
+        // MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+        // .post(Entity.entity(formParams,
+        // MediaType.APPLICATION_JSON_TYPE));
 
-            result = restResponse.readEntity(String.class);
-            log.debug(result);
-            checkAccessTokenResult(restResponse);
+        result = restResponse.readEntity(String.class);
+        log.debug(result);
+        checkAccessTokenResult(restResponse);
 
-        } catch (BadRequestException e) {
-            throw new ServletException(e);
-        }
         return result;
 
     }
