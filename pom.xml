@@ -66,6 +66,12 @@
 			<artifactId>jersey-apache-connector</artifactId>
 			<version>${jersey.version}</version>
 		</dependency>
+		<!-- jersyでJavaBeansをJSON でPOSTする場合。 -->
+		<dependency>
+			<groupId>org.glassfish.jersey.media</groupId>
+			<artifactId>jersey-media-json-jackson</artifactId>
+			<version>${jersey.version}</version>
+		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>

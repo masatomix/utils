@@ -12,9 +12,8 @@
 
 package nu.mine.kino.utils;
 
-import static nu.mine.kino.Constants.PARAM_STATE;
-import static nu.mine.kino.Constants.SESSION_STATE;
-import static nu.mine.kino.utils.JSONUtils.getRSAKey;
+import static nu.mine.kino.Constants.*;
+import static nu.mine.kino.utils.JSONUtils.*;
 
 import java.io.IOException;
 import java.security.KeyManagementException;
@@ -39,14 +38,16 @@ import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.Response.StatusType;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.glassfish.jersey.apache.connector.ApacheConnectorProvider;
 import org.glassfish.jersey.client.ClientConfig;
+import org.glassfish.jersey.client.ClientProperties;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -141,33 +142,51 @@ public class Utils {
     public static void checkAccessTokenResult(Response restResponse)
             throws ServletException {
         StatusType statusInfo = restResponse.getStatusInfo();
-        if (statusInfo.getStatusCode() != Status.OK.getStatusCode()) {
-            String message = String.format("%s:[%s]",
+        switch (statusInfo.getFamily()) {
+        case CLIENT_ERROR:
+        case SERVER_ERROR:
+            String message = String.format("Status: %s:[%s]",
                     statusInfo.getStatusCode(), statusInfo.getReasonPhrase());
             throw new ServletException(message);
+        default:
+            break;
         }
+        // if (statusInfo.getStatusCode() != Status.OK.getStatusCode()) {
+        // String message = String.format("%s:[%s]",
+        // statusInfo.getStatusCode(), statusInfo.getReasonPhrase());
+        // throw new ServletException(message);
+        // }
     }
 
     public static String getAccessTokenJSON(String oauth_server,
             String redirect_url, String client_id, String client_secret,
-            String authorizationCode) throws ServletException {
-        String grant_type = "authorization_code";
-
+            String authorizationCode, Client client, MediaType mediaType)
+                    throws ServletException {
         String result = null;
-        MultivaluedHashMap<String, String> formParams = new MultivaluedHashMap<String, String>();
+        String grant_type = "authorization_code";
+        MultivaluedMap<String, String> formParams = new MultivaluedHashMap<String, String>();
         formParams.putSingle("client_secret", client_secret);
         formParams.putSingle("client_id", client_id);
         formParams.putSingle("grant_type", grant_type);
         formParams.putSingle("redirect_uri", redirect_url);
         formParams.putSingle("code", authorizationCode);
 
+        // Map<String, String> formParams = new HashMap<String, String>();
+        // formParams.put("client_secret", client_secret);
+        // formParams.put("client_id", client_id);
+        // formParams.put("grant_type", grant_type);
+        // formParams.put("redirect_uri", redirect_url);
+        // formParams.put("code", authorizationCode);
         try {
             log.debug("OAuthServer:{}", oauth_server);
-            Response restResponse = ClientBuilder.newClient() //
+            Response restResponse = client //
                     .target(oauth_server) //
                     .request(MediaType.APPLICATION_JSON_TYPE)
-                    .post(Entity.entity(formParams,
-                            MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+                    .post(Entity.entity(formParams, mediaType));
+            // .post(Entity.entity(formParams,
+            // MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+            // .post(Entity.entity(formParams,
+            // MediaType.APPLICATION_JSON_TYPE));
 
             result = restResponse.readEntity(String.class);
             log.debug(result);
@@ -177,12 +196,27 @@ public class Utils {
             throw new ServletException(e);
         }
         return result;
+
     }
 
-    public static String getResource(String resource_server,
-            String accessToken) {
+    public static String getAccessTokenJSON(String oauth_server,
+            String redirect_url, String client_id, String client_secret,
+            String authorizationCode, Client client) throws ServletException {
+        return getAccessTokenJSON(oauth_server, redirect_url, client_id,
+                client_secret, authorizationCode, client,
+                MediaType.APPLICATION_FORM_URLENCODED_TYPE);
+    }
 
-        Client client = createSecureClient();
+    public static String getAccessTokenJSON(String oauth_server,
+            String redirect_url, String client_id, String client_secret,
+            String authorizationCode) throws ServletException {
+        Client client = ClientBuilder.newClient();
+        return getAccessTokenJSON(oauth_server, redirect_url, client_id,
+                client_secret, authorizationCode, client);
+    }
+
+    public static String getResource(String resource_server, String accessToken,
+            Client client) {
         // Client client = createClient();
 
         // MultivaluedHashMap<String, String> formParams = new
@@ -206,19 +240,34 @@ public class Utils {
         return result;
     }
 
-    public static Client createClient() {
-        return ClientBuilder.newClient();
+    public static String getResource(String resource_server,
+            String accessToken) {
+
+        Client client = ClientBuilder.newClient();
+        return getResource(resource_server, accessToken, client);
+
     }
 
-    public static Client createSecureClient() {
-        // String proxyHost = "http://127.0.0.1:8080";
-        ClientConfig config = new ClientConfig();
+    /**
+     * 
+     * @param properties
+     * @return
+     */
+    public static Client createSecureClient(String... properties) {
 
-        // providerをproxy対応?にする
+        ClientConfig config = new ClientConfig();
         config.connectorProvider(new ApacheConnectorProvider());
-        // config.property(ClientProperties.PROXY_URI, proxyHost);
-        // config.property(ClientProperties.PROXY_USERNAME, "userName");
-        // config.property(ClientProperties.PROXY_PASSWORD, "password");
+        if (ArrayUtils.isNotEmpty(properties)) {
+            // providerをproxy対応?にする
+            String proxyHost = properties[0];
+            config.property(ClientProperties.PROXY_URI, proxyHost);
+            if (properties.length > 2) {
+                String userName = properties[1];
+                String password = properties[2];
+                config.property(ClientProperties.PROXY_USERNAME, userName);
+                config.property(ClientProperties.PROXY_PASSWORD, password);
+            }
+        }
 
         SSLContext sslContext = createSSLContext();
         HostnameVerifier hostnameVerifier = createHostNameVerifier();
@@ -228,6 +277,25 @@ public class Utils {
                 .sslContext(sslContext).hostnameVerifier(hostnameVerifier);
         return b.build();
     }
+
+    // public static Client createSecureClient() {
+    // // String proxyHost = "http://127.0.0.1:8080";
+    // ClientConfig config = new ClientConfig();
+    //
+    // // providerをproxy対応?にする
+    // config.connectorProvider(new ApacheConnectorProvider());
+    // // config.property(ClientProperties.PROXY_URI, proxyHost);
+    // // config.property(ClientProperties.PROXY_USERNAME, "userName");
+    // // config.property(ClientProperties.PROXY_PASSWORD, "password");
+    //
+    // SSLContext sslContext = createSSLContext();
+    // HostnameVerifier hostnameVerifier = createHostNameVerifier();
+    //
+    // // builderの生成
+    // ClientBuilder b = ClientBuilder.newBuilder().withConfig(config)
+    // .sslContext(sslContext).hostnameVerifier(hostnameVerifier);
+    // return b.build();
+    // }
 
     public static SSLContext createSSLContext() {
         SSLContext sslContext = null;
