@@ -34,7 +34,6 @@ import javax.net.ssl.X509TrustManager;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
-import javax.ws.rs.BadRequestException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
@@ -62,6 +61,10 @@ import com.nimbusds.jwt.SignedJWT;
 
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * @author Masatomi KINO
+ * @version $Revision$
+ */
 /**
  * @author Masatomi KINO
  * @version $Revision$
@@ -149,6 +152,7 @@ public class Utils {
         case SERVER_ERROR:
             String message = String.format("Status: %s:[%s]",
                     statusInfo.getStatusCode(), statusInfo.getReasonPhrase());
+            log.error("{}", restResponse.getStatusInfo());
             throw new ServletException(message);
         default:
             break;
@@ -160,63 +164,66 @@ public class Utils {
         // }
     }
 
-    public static String getAccessToken_JSON_APPLICATION_JSON_TYPE(
-            String oauth_server, String redirect_url, String client_id,
-            String client_secret, String authorizationCode, Client client)
-            throws ServletException {
-        String result = null;
+    /**
+     * AccessToken取得のためのMapを作成する。Qiitaだけ、
+     * 
+     * <pre>
+     * Content-Type: application/x-www-form-urlencoded
+     * </pre>
+     * 
+     * を受け付けないので、パラメタ生成の処理を分けている。
+     * 
+     * @param redirect_url
+     * @param client_id
+     * @param client_secret
+     * @param authorizationCode
+     * @param client
+     * @param mediaType
+     * @return
+     */
+    private static Map<String, ?> createMap(String redirect_url,
+            String client_id, String client_secret, String authorizationCode,
+            Client client, MediaType mediaType) {
+
         String grant_type = "authorization_code";
+        MultivaluedMap<String, String> formParams = new MultivaluedHashMap<String, String>();
+        formParams.putSingle("redirect_uri", redirect_url);
+        formParams.putSingle("grant_type", grant_type);
+        formParams.putSingle("client_id", client_id);
+        formParams.putSingle("client_secret", client_secret);
+        formParams.putSingle("code", authorizationCode);
 
-        Map<String, String> formParams = new HashMap<String, String>();
-        formParams.put("client_secret", client_secret);
-        formParams.put("client_id", client_id);
-        formParams.put("grant_type", grant_type);
-        formParams.put("redirect_uri", redirect_url);
-        formParams.put("code", authorizationCode);
-        log.debug("OAuthServer:{}", oauth_server);
-        Response restResponse = client //
-                .target(oauth_server) //
-                .request(MediaType.APPLICATION_JSON_TYPE).post(Entity
-                        .entity(formParams, MediaType.APPLICATION_JSON_TYPE));
-        result = restResponse.readEntity(String.class);
-        log.debug(result);
-        checkAccessTokenResult(restResponse);
-
-        return result;
+        if (mediaType.equals(MediaType.APPLICATION_JSON_TYPE)) {
+            Map<String, String> jsonParams = new HashMap<String, String>();
+            jsonParams.put("redirect_uri", redirect_url);
+            jsonParams.put("grant_type", grant_type);
+            jsonParams.put("client_id", client_id);
+            jsonParams.put("client_secret", client_secret);
+            jsonParams.put("code", authorizationCode);
+            return jsonParams;
+        }
+        return formParams;
 
     }
 
     public static String getAccessTokenJSON(String oauth_server,
             String redirect_url, String client_id, String client_secret,
             String authorizationCode, Client client, MediaType mediaType)
-            throws ServletException {
+                    throws ServletException {
         String result = null;
-        String grant_type = "authorization_code";
-        MultivaluedMap<String, String> formParams = new MultivaluedHashMap<String, String>();
-        formParams.putSingle("client_secret", client_secret);
-        formParams.putSingle("client_id", client_id);
-        formParams.putSingle("grant_type", grant_type);
-        formParams.putSingle("redirect_uri", redirect_url);
-        formParams.putSingle("code", authorizationCode);
 
-        // Map<String, String> formParams = new HashMap<String, String>();
-        // formParams.put("client_secret", client_secret);
-        // formParams.put("client_id", client_id);
-        // formParams.put("grant_type", grant_type);
-        // formParams.put("redirect_uri", redirect_url);
-        // formParams.put("code", authorizationCode);
+        Map<String, String> formParams = (Map<String, String>) createMap(
+                redirect_url, client_id, client_secret, authorizationCode,
+                client, mediaType);
+
         log.debug("OAuthServer:{}", oauth_server);
+        log.debug("MediaType: {}", mediaType);
         Response restResponse = client //
                 .target(oauth_server) //
                 .request(MediaType.APPLICATION_JSON_TYPE)
                 .post(Entity.entity(formParams, mediaType));
-        // .post(Entity.entity(formParams,
-        // MediaType.APPLICATION_FORM_URLENCODED_TYPE));
-        // .post(Entity.entity(formParams,
-        // MediaType.APPLICATION_JSON_TYPE));
-
         result = restResponse.readEntity(String.class);
-        log.debug(result);
+        log.debug("result: {}", result);
         checkAccessTokenResult(restResponse);
 
         return result;
