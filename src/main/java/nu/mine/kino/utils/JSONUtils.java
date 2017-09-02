@@ -57,6 +57,14 @@ public class JSONUtils {
         return mapper.writeValueAsString(obj);
     }
 
+    /**
+     * 指定されたURLから、JWKを取得
+     * 
+     * @param url
+     * @return
+     * @throws IOException
+     * @throws ParseException
+     */
     public static JWKSet getJWKSet(String url)
             throws IOException, ParseException {
         // HTTP connect timeout in milliseconds
