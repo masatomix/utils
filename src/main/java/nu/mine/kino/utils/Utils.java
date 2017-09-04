@@ -393,7 +393,6 @@ public class Utils {
         // log.debug("ID_TOKEN_HEADER: {}", ID_TOKEN_HEADER);
         // log.debug("ID_TOKEN_PAYLOAD: {}", ID_TOKEN_PAYLOAD);
         // // log.debug("ID_TOKEN_SIGNATURE: {}", ID_TOKEN_SIGNATURE);
-        boolean verify = false;
 
         try {
             // JWTの仕様に基づいて、デコードしてみる。

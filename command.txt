@@ -5,3 +5,6 @@ mvn gitflow:release-start
 mvn clean deploy
 mvn gitflow:release-finish
 
+
+curl -O https://connect2id.com/assets/products/nimbus-jose-jwt/download/json-web-key-generator.jar
+java -jar json-web-key-generator.jar -t RSA -s 2048 -i 1 -u sig  -S -p
