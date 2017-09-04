@@ -119,14 +119,24 @@ public class Utils {
         return redirect_url;
     }
 
-    public static String base64DecodeStr(String input) {
-        return new String(Base64.decodeBase64(input));
+    public static String decodeBase64String(String base64Data) {
+        return new String(Base64.decodeBase64(base64Data));
     }
 
-    public static byte[] base64Decode(String input) {
-        return Base64.decodeBase64(input);
+    public static byte[] decodeBase64(String base64String) {
+        return Base64.decodeBase64(base64String);
     }
 
+    public static String encodeBase64URLSafeString(byte[] binaryData) {
+        return Base64.encodeBase64URLSafeString(binaryData);
+    }
+
+    /**
+     * CSRF対策。 セッションが存在するか、存在するなら、セッション内のstate 属性とリクエストパラメタのstateパラメタの値の一致チェック
+     * 
+     * @param request
+     * @throws ServletException
+     */
     public static void checkCSRF(HttpServletRequest request)
             throws ServletException {
         HttpSession session = request.getSession(false);
@@ -144,6 +154,12 @@ public class Utils {
         }
     }
 
+    /**
+     * レスポンスのHTTP Response Statusのチェック。400番台、500番台の場合例外
+     * 
+     * @param restResponse
+     * @throws ServletException
+     */
     public static void checkAccessTokenResult(Response restResponse)
             throws ServletException {
         StatusType statusInfo = restResponse.getStatusInfo();
@@ -157,11 +173,6 @@ public class Utils {
         default:
             break;
         }
-        // if (statusInfo.getStatusCode() != Status.OK.getStatusCode()) {
-        // String message = String.format("%s:[%s]",
-        // statusInfo.getStatusCode(), statusInfo.getReasonPhrase());
-        // throw new ServletException(message);
-        // }
     }
 
     /**
@@ -209,7 +220,7 @@ public class Utils {
     public static String getAccessTokenJSON(String oauth_server,
             String redirect_url, String client_id, String client_secret,
             String authorizationCode, Client client, MediaType mediaType)
-                    throws ServletException {
+            throws ServletException {
         String result = null;
 
         Map<String, String> formParams = (Map<String, String>) createMap(
@@ -246,22 +257,9 @@ public class Utils {
                 client_secret, authorizationCode, client);
     }
 
-    public static String getResource(String resource_server, String accessToken,
+    public static String getResource(String target, String accessToken,
             Client client) {
-        // Client client = createClient();
-
-        // MultivaluedHashMap<String, String> formParams = new
-        // MultivaluedHashMap<String, String>();
-        // Response restResponse = client.target(usersUrl)
-        // .request(MediaType.APPLICATION_JSON_TYPE)
-        // .header("Authorization", "token " + accessToken)
-        // .post(Entity.entity(formParams,
-        // MediaType.APPLICATION_FORM_URLENCODED_TYPE));
-        //
-        // System.out.println(restResponse.readEntity(String.class));
-
-        log.debug("Resource Server:{}", resource_server);
-        Response restResponse = client.target(resource_server)
+        Response restResponse = client.target(target)
                 .queryParam("schema", "openid")//
                 .request(MediaType.APPLICATION_JSON_TYPE)
                 .header("Authorization", "Bearer " + accessToken).get();
@@ -280,6 +278,7 @@ public class Utils {
     }
 
     /**
+     * プロクシ経由でSSLを通れるように対応したClient。
      * 
      * @param properties
      * @return
@@ -309,26 +308,7 @@ public class Utils {
         return b.build();
     }
 
-    // public static Client createSecureClient() {
-    // // String proxyHost = "http://127.0.0.1:8080";
-    // ClientConfig config = new ClientConfig();
-    //
-    // // providerをproxy対応?にする
-    // config.connectorProvider(new ApacheConnectorProvider());
-    // // config.property(ClientProperties.PROXY_URI, proxyHost);
-    // // config.property(ClientProperties.PROXY_USERNAME, "userName");
-    // // config.property(ClientProperties.PROXY_PASSWORD, "password");
-    //
-    // SSLContext sslContext = createSSLContext();
-    // HostnameVerifier hostnameVerifier = createHostNameVerifier();
-    //
-    // // builderの生成
-    // ClientBuilder b = ClientBuilder.newBuilder().withConfig(config)
-    // .sslContext(sslContext).hostnameVerifier(hostnameVerifier);
-    // return b.build();
-    // }
-
-    public static SSLContext createSSLContext() {
+    private static SSLContext createSSLContext() {
         SSLContext sslContext = null;
         try {
             sslContext = SSLContext.getInstance("TLS");
@@ -360,7 +340,7 @@ public class Utils {
         return sslContext;
     }
 
-    public static HostnameVerifier createHostNameVerifier() {
+    private static HostnameVerifier createHostNameVerifier() {
         return new HostnameVerifier() {
             @Override
             public boolean verify(String hostname, SSLSession session) {
@@ -369,8 +349,41 @@ public class Utils {
         };
     }
 
+    public static boolean checkHSSignature(SignedJWT decodeObject,
+            byte[] sharedSecret) throws JOSEException {
+        JWSVerifier verifier = new MACVerifier(sharedSecret);
+        boolean verify = decodeObject.verify(verifier);
+        log.debug("valid？: {}", verify);
+        return verify;
+    }
+
+    public static boolean checkRSSignature(SignedJWT decodeObject,
+            String jwks_uri) throws JOSEException, IOException, ParseException {
+        // Headerから KeyIDを取得して、
+        String keyID = decodeObject.getHeader().getKeyID();
+        log.debug("KeyID: {}", keyID);
+
+        // ちなみにGoogleは
+        // http://qiita.com/trysmr/items/e8d4225ff6a603e9e21a によると
+        // https://www.googleapis.com/oauth2/v3/certs
+        // ちなみにAuthleteは
+        // https://[サーバ名]/api/jwks
+        // だがデフォルトだとかえんないっぽい。設定しないとかな。
+        RSAKey rsaKey = getRSAKey(jwks_uri, keyID);
+        JWSVerifier verifier = new RSASSAVerifier(rsaKey);
+        boolean verify = decodeObject.verify(verifier);
+        log.debug("valid？: {}", verify);
+        return verify;
+    }
+
+    // public static boolean checkRSSignature(SignedJWT decodeObject,
+    // byte[] publicKey) {
+    //
+    // }
+
     public static boolean checkIdToken(String id_token, String jwks_uri,
             String secret) throws ServletException {
+        // ココ手動でクチャクチャやってるけど、Nimbusを使って書き換え。
         // String[] id_token_parts = id_token.split("\\.");
         //
         // String ID_TOKEN_HEADER = base64DecodeStr(id_token_parts[0]);
@@ -380,7 +393,6 @@ public class Utils {
         // log.debug("ID_TOKEN_HEADER: {}", ID_TOKEN_HEADER);
         // log.debug("ID_TOKEN_PAYLOAD: {}", ID_TOKEN_PAYLOAD);
         // // log.debug("ID_TOKEN_SIGNATURE: {}", ID_TOKEN_SIGNATURE);
-        boolean verify = false;
 
         try {
             // JWTの仕様に基づいて、デコードしてみる。
@@ -402,27 +414,10 @@ public class Utils {
             if (algorithm.getName().startsWith("HS")) {
                 log.debug("共通鍵({})", algorithm.getName());
                 byte[] sharedSecret = secret.getBytes(); // バイト列に変換
-                JWSVerifier verifier = new MACVerifier(sharedSecret);
-                verify = decodeObject.verify(verifier);
-                log.debug("valid？: {}", verify);
-                return verify;
+                return checkHSSignature(decodeObject, sharedSecret);
             } else {
                 log.debug("公開鍵({})", algorithm.getName());
-                // Headerから KeyIDを取得して、
-                String keyID = decodeObject.getHeader().getKeyID();
-                log.debug("KeyID: {}", keyID);
-
-                // ちなみにGoogleは
-                // http://qiita.com/trysmr/items/e8d4225ff6a603e9e21a によると
-                // https://www.googleapis.com/oauth2/v3/certs
-                // ちなみにAuthleteは
-                // https://[サーバ名]/api/jwks
-                // だがデフォルトだとかえんないっぽい。設定しないとかな。
-                RSAKey rsaKey = getRSAKey(jwks_uri, keyID);
-                JWSVerifier verifier = new RSASSAVerifier(rsaKey);
-                verify = decodeObject.verify(verifier);
-                log.debug("valid？: {}", verify);
-                return verify;
+                return checkRSSignature(decodeObject, jwks_uri);
             }
 
         } catch (ParseException e) {

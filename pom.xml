@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>nu.mine.kino</groupId>
 	<artifactId>utils</artifactId>
-	<version>0.1.5</version>
+	<version>0.1.6</version>
 	<name>Utility</name>
 	<url>https://github.com/masatomix/utils</url>
 	<licenses>
@@ -102,6 +102,15 @@
 			<artifactId>nimbus-jose-jwt</artifactId>
 			<version>4.23</version>
 		</dependency>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.11</version>
+			<scope>test</scope>
+		</dependency>
+
+
+
 	</dependencies>
 	<repositories>
 		<repository>
