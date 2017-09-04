@@ -17,6 +17,8 @@ import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.InvalidKeyException;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -33,6 +35,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.codec.digest.HmacUtils;
 import org.junit.Test;
 
@@ -59,21 +62,6 @@ import nu.mine.kino.utils.Utils;
  * @version $Revision$
  */
 public class UtilsTest {
-
-    @Test
-    public void hoge() throws IOException, ParseException {
-        String url = "https://auth.login.yahoo.co.jp/yconnect/v2/jwks";
-
-        // nimbus
-        // JWKSet -> JWK -> RSAKey
-        JWKSet jwkSet = JSONUtils.getJWKSet(url);
-        System.out.println(JSONUtils.toPrettyStr(jwkSet));
-        String keyID = "0cc175b9c0f1b6a831c399e269772661";
-
-        JWK key = jwkSet.getKeyByKeyId(keyID);
-        RSAKey rsaKey = RSAKey.parse(key.toJSONObject());
-
-    }
 
     @Test
     public void testHmacUtils001() {
@@ -106,6 +94,24 @@ public class UtilsTest {
         mac.update(data.getBytes());
 
         return mac.doFinal();
+    }
+
+    // JSON Web Key (JWK) Thumbprint
+    // http://openid-foundation-japan.github.io/rfc7638.ja.html
+    @Test
+    public void testSha256_001() {
+        // kidの仕様について。JSON文字列のSha256ハッシュらしい。
+
+        try {
+            byte[] data = Files.readAllBytes(Paths.get("sample.json"));
+            String kid = Base64
+                    .encodeBase64URLSafeString(DigestUtils.sha256(data));
+            System.out.printf("kid: %s\n", kid);
+            assertThat(kid, is("NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs"));
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+
     }
 
     // https://connect2id.com/products/nimbus-jose-jwt/examples/jws-with-rsa-signature
@@ -258,4 +264,29 @@ public class UtilsTest {
         }
     }
 
+    @Test
+    public void jwks_endpoint_test() throws IOException, ParseException {
+        String url = "https://auth.login.yahoo.co.jp/yconnect/v2/jwks";
+
+        // nimbus
+        // JWKSet -> JWK -> RSAKey
+        JWKSet jwkSet = JSONUtils.getJWKSet(url);
+        String keyID = "0cc175b9c0f1b6a831c399e269772661";
+
+        JWK key = jwkSet.getKeyByKeyId(keyID);
+        RSAKey rsaKey = RSAKey.parse(key.toJSONObject());
+
+        try {
+            JWSSigner signer = new RSASSASigner(rsaKey);
+            fail("秘密鍵がないJWKで署名クラスを作ったのに、例外が発生しなかった");
+        } catch (JOSEException e) {
+        }
+
+        try {
+            JWSVerifier verifier = new RSASSAVerifier(rsaKey);
+        } catch (JOSEException e) {
+            fail("秘密鍵がないJWKでも署名検証クラスは作れるはずなのに、エラーになってしまった。");
+        }
+
+    }
 }
