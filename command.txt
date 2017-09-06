@@ -8,3 +8,14 @@ mvn gitflow:release-finish
 
 curl -O https://connect2id.com/assets/products/nimbus-jose-jwt/download/json-web-key-generator.jar
 java -jar json-web-key-generator.jar -t RSA -s 2048 -i 1 -u sig  -S -p
+
+
+
+http://www.masatom.in/pukiwiki/Linux/%B8%F8%B3%AB%B8%B0%B0%C5%B9%E6/
+ssh-keygen -t rsa -b 4096 -C "masatomix@ki-no.org" -f sshkeygen
+ssh-keygen -e -m PKCS8 -f sshkeygen.pub  > sshkeygen.pub.pem
+
+openssl rsa -pubout  -in sshkeygen -out public.der -outform DER
+openssl pkcs8 -topk8 -nocrypt  -in sshkeygen -out private.pk8 -outform DER
+
+

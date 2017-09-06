@@ -19,26 +19,34 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.security.InvalidKeyException;
+import java.security.Key;
+import java.security.KeyFactory;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.crypto.Mac;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.commons.codec.digest.HmacUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.Test;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
@@ -61,76 +69,46 @@ import nu.mine.kino.utils.Utils;
  * @author Masatomi KINO
  * @version $Revision$
  */
+/**
+ * @author Masatomi KINO
+ * @version $Revision$
+ */
 public class UtilsTest {
-
-    @Test
-    public void testHmacUtils001() {
-
-        String data = "Hello, world!";
-        String key = "aaaaaaaaaabbbbbbaaaaaaaaaabbbbbb"; // <-256bitの共通鍵
-
-        try {
-            String result01 = Base64
-                    .encodeBase64URLSafeString(hmacSha256(key, data));
-            String result02 = Base64
-                    .encodeBase64URLSafeString(HmacUtils.hmacSha256(key, data));
-            System.out.println(result01);
-            System.out.println(result02);
-
-            assertThat(result01, is(result02));
-        } catch (Exception e) {
-            fail(e.getMessage());
-        }
-
-    }
-
-    private static byte[] hmacSha256(String secretKey, String data)
-            throws NoSuchAlgorithmException, InvalidKeyException {
-        String algorithm = "HmacSHA256";
-        SecretKey key = new SecretKeySpec(secretKey.getBytes(), algorithm);
-
-        Mac mac = Mac.getInstance(algorithm);
-        mac.init(key);
-        mac.update(data.getBytes());
-
-        return mac.doFinal();
-    }
 
     // JSON Web Key (JWK) Thumbprint
     // http://openid-foundation-japan.github.io/rfc7638.ja.html
+    /**
+     * kidの仕様について。kidは、必須プロパティで構成したJSON文字列のSha256ハッシュらしい。
+     */
     @Test
-    public void testSha256_001() {
+    public void testJWK_kid_is_Sha256_001() {
         // kidの仕様について。JSON文字列のSha256ハッシュらしい。
-
+        String expected_kid = "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs"; // JSON内のkidの値
         try {
+            // このJSONファイルは、RFCのサイトのサンプルのJWKファイル
             byte[] data = Files.readAllBytes(Paths.get("sample.json"));
-            String kid = Base64
+            String actual_value = Base64
                     .encodeBase64URLSafeString(DigestUtils.sha256(data));
-            System.out.printf("kid: %s\n", kid);
-            assertThat(kid, is("NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs"));
+            System.out.printf("kid: %s\n", actual_value);
+            assertThat(actual_value, is(expected_kid));
         } catch (Exception e) {
             fail(e.getMessage());
         }
-
     }
 
     // https://connect2id.com/products/nimbus-jose-jwt/examples/jws-with-rsa-signature
     // https://connect2id.com/products/nimbus-jose-jwt/examples/jwk-conversion
+    /**
+     * javaの標準ライブラリとconnect2idのnimbusライブラリの相互変換
+     */
     @Test
     public void java2nimbus_and_nimbus2java_sample() {
 
         // Javaの世界 のKeyPairからはじめる
-        java.security.KeyPair keyPair = null;
-        try {
-            KeyPairGenerator keyGenerator = KeyPairGenerator.getInstance("RSA");
-            keyGenerator.initialize(1024);
-            keyPair = keyGenerator.genKeyPair();
-        } catch (NoSuchAlgorithmException e) {
-            fail(e.getMessage());
-        }
-
-        RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
-        RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
+        Key[] keys = null;
+        keys = createJavaAPIKey();
+        RSAPublicKey publicKey = (RSAPublicKey) keys[0];
+        RSAPrivateKey privateKey = (RSAPrivateKey) keys[1];
         // Javaの世界 以上
 
         // そのオブジェクトをnimbusのオブジェクトへ変換。keyIDなども付与
@@ -143,22 +121,32 @@ public class UtilsTest {
         // あらためて、Javaの世界のオブジェクトへ戻す
         // Convert back to std Java interface
         try {
+            RSAPublicKey convertedRSAPublicKey = rsaKey.toRSAPublicKey();
+            RSAPrivateKey convertedRSAPrivateKey = rsaKey.toRSAPrivateKey();
+
+            assertThat(convertedRSAPublicKey, is(publicKey));
+            assertThat(convertedRSAPrivateKey, is(privateKey));
+
             java.security.PublicKey convertedPublicKey = rsaKey.toPublicKey();
             java.security.PrivateKey convertedPrivateKey = rsaKey
                     .toPrivateKey();
 
-            // これら↓は、RSAがつかない上のサブクラスになっているだけ。
-            RSAPublicKey convertedRSAPublicKey = rsaKey.toRSAPublicKey();
-            RSAPrivateKey convertedRSAPrivateKey = rsaKey.toRSAPrivateKey();
-
             assertThat(convertedPublicKey, is((PublicKey) publicKey));
             assertThat(convertedPrivateKey, is((PrivateKey) privateKey));
 
-            assertThat(convertedRSAPublicKey, is(publicKey));
-            assertThat(convertedRSAPrivateKey, is(privateKey));
         } catch (JOSEException e) {
             fail(e.getMessage());
         }
+
+    }
+
+    @Test
+    public void testJWKSet() {
+
+        // Javaの世界 のKeyPairからはじめる
+        Key[] keys = createJavaAPIKey();
+        RSAPublicKey publicKey = (RSAPublicKey) keys[0];
+        RSAPrivateKey privateKey = (RSAPrivateKey) keys[1];
 
         ////////
         // JavaのKeyPairから、JWKSetをつくる
@@ -175,6 +163,185 @@ public class UtilsTest {
         // JSON文字列として出力。多分そのままファイル保存すればJWKのファイルとしていけるモノと思われる
         System.out.println(jwkSet.toJSONObject(false).toJSONString());
 
+    }
+
+    @Test
+    public void testPrintJWK() throws JsonProcessingException {
+
+        Key[] keys = createJavaAPIKey();
+        // 秘密キーと公開キーを表示
+        for (Key key : keys) {
+            String algo = key.getAlgorithm();
+            String format = key.getFormat();
+            byte[] bin = key.getEncoded();
+            String encoded = Utils.encodeBase64URLSafeString(bin);
+            System.out.println(
+                    "algo=" + algo + "/format=" + format + "/key=" + encoded);
+        }
+
+        RSAPublicKey publicKey = (RSAPublicKey) keys[0];
+        RSAPrivateKey privateKey = (RSAPrivateKey) keys[1];
+
+        // RSAPublicKey publicKey = createPublicKey();
+        // RSAPrivateKey privateKey = createPrivateKey();
+
+        // そのオブジェクトをnimbusのオブジェクトへ変換。keyIDなども付与
+        // Convert to JWK format
+        RSAKey rsaKey = new RSAKey.Builder(publicKey)//
+                .privateKey(privateKey)//
+                .keyID(Utils.getRandomString())//
+                .build();
+        // JSON文字列として出力。多分そのままファイル保存すればJWKのファイルとしていけるモノと思われる
+        System.out.println(JSONUtils.toPrettyStr(rsaKey));
+
+    }
+
+    
+    /**
+     * ターミナルのssh-keygen/opensllコマンドなどで作成した、公開鍵、秘密鍵を使ってJavaで暗号化・復号化するテスト。 
+     */
+    @Test
+    public void testEncrypt_and_decrypt() {
+        Key[] keys = createJavaAPIKeyFromFile();
+        // opensslやssh-keygenによって作成された秘密鍵、公開鍵からJavaのprivate/public 鍵を作成するサンプル
+        PublicKey publicKey = (PublicKey) keys[0];
+        PrivateKey privateKey = (PrivateKey) keys[1];
+
+        // 暗号化してファイル出力して、そのあと復号化してみた。
+        String expected = "Hello World.\n";
+        String output = "encrypted.out";
+        writeEncryptedFile(expected, publicKey, new File(output));
+        String result = readDecryptedFile(privateKey, new File(output));
+
+        assertThat(result, is(expected));
+
+    }
+
+    // https://blog.ik.am/entries/327
+    // http://unhurried.hatenablog.com/entry/openssl_java_rsa_key
+    // $ openssl rsa -pubout \
+    // -in sshkeygen -out public.der -outform DER
+    // $ openssl pkcs8 -topk8 -nocrypt \
+    // -in sshkeygen -out private.pk8 -outform DER
+    private Key[] createJavaAPIKey() {
+        // Javaの世界 のKeyPairからはじめる
+        java.security.KeyPair keyPair = null;
+        try {
+            KeyPairGenerator keyGenerator = KeyPairGenerator.getInstance("RSA");
+            keyGenerator.initialize(1024);
+            keyPair = keyGenerator.genKeyPair();
+        } catch (NoSuchAlgorithmException e) {
+            fail(e.getMessage());
+        }
+        PublicKey publicKey = keyPair.getPublic();
+        PrivateKey privateKey = keyPair.getPrivate();
+        // Javaの世界 以上
+        return new Key[] { publicKey, privateKey };
+    }
+
+    private Key[] createJavaAPIKeyFromFile() {
+        return new Key[] { createPublicKey(), createPrivateKey() };
+    }
+
+    private PrivateKey createPrivateKey() {
+        try {
+            KeyFactory factory = KeyFactory.getInstance("RSA");
+            byte[] keyBytes = Files.readAllBytes(Paths.get("private.pk8"));
+            PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
+            PrivateKey privateKey = factory.generatePrivate(keySpec);
+            return privateKey;
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalArgumentException(e);
+        } catch (InvalidKeySpecException e) {
+            throw new IllegalArgumentException(e);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
+    private PublicKey createPublicKey() {
+        try {
+            KeyFactory factory = KeyFactory.getInstance("RSA");
+            byte[] keyBytes = Files.readAllBytes(Paths.get("public.der"));
+            X509EncodedKeySpec keyspec = new X509EncodedKeySpec(keyBytes);
+            PublicKey publicKey = factory.generatePublic(keyspec);
+            return publicKey;
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalArgumentException(e);
+        } catch (InvalidKeySpecException e) {
+            throw new IllegalArgumentException(e);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
+    /**
+     * 公開鍵で暗号化。基本的に、
+     * 
+     * echo "Hello World." | openssl rsautl -encrypt -pubin -inkey \
+     * sshkeygen.pub.pem > encrypted.out
+     *
+     * とおなじになるハズ(今んとこならないが、、、、。)
+     * 
+     * http://www.masatom.in/pukiwiki/Linux/%B8%F8%B3%AB%B8%B0%B0%C5%B9%E6/
+     * 
+     * @param expected
+     * @param publicKey
+     * @param file
+     */
+    private void writeEncryptedFile(String expected, PublicKey publicKey,
+            File file) {
+        try {
+            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, publicKey);
+            byte[] bytes = cipher.doFinal(expected.getBytes());
+            Files.write(Paths.get(file.getAbsolutePath()), bytes);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalArgumentException(e);
+        } catch (NoSuchPaddingException e) {
+            throw new IllegalArgumentException(e);
+        } catch (InvalidKeyException e) {
+            throw new IllegalArgumentException(e);
+        } catch (IllegalBlockSizeException e) {
+            throw new IllegalArgumentException(e);
+        } catch (BadPaddingException e) {
+            throw new IllegalArgumentException(e);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
+    /**
+     * 秘密鍵で復号する。基本的に、
+     * 
+     * openssl rsautl -decrypt -inkey sshkeygen -in encrypted.out
+     * 
+     * とおなじハズ。上記Javaメソッドで作成したファイルは、Javaでも復号出来たし、プロンプトからでも復号出来た。
+     * @param privateKey
+     * @param file
+     * @return
+     */
+    private String readDecryptedFile(PrivateKey privateKey, File file) {
+        try {
+            byte[] encrypted = Files
+                    .readAllBytes(Paths.get(file.getAbsolutePath()));
+            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipher.init(Cipher.DECRYPT_MODE, privateKey);
+            byte[] decrypted = cipher.doFinal(encrypted);
+            return new String(decrypted, "UTF-8");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalArgumentException(e);
+        } catch (NoSuchPaddingException e) {
+            throw new IllegalArgumentException(e);
+        } catch (InvalidKeyException e) {
+            throw new IllegalArgumentException(e);
+        } catch (IllegalBlockSizeException e) {
+            throw new IllegalArgumentException(e);
+        } catch (BadPaddingException e) {
+            throw new IllegalArgumentException(e);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
     // jwkファイルから、オブジェクトを生成する。
@@ -289,4 +456,5 @@ public class UtilsTest {
         }
 
     }
+
 }
