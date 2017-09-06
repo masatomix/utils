@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>nu.mine.kino</groupId>
 	<artifactId>utils</artifactId>
-	<version>0.1.6</version>
+	<version>0.1.7</version>
 	<name>Utility</name>
 	<url>https://github.com/masatomix/utils</url>
 	<licenses>
