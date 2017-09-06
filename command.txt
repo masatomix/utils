@@ -19,3 +19,5 @@ openssl rsa -pubout  -in sshkeygen -out public.der -outform DER
 openssl pkcs8 -topk8 -nocrypt  -in sshkeygen -out private.pk8 -outform DER
 
 
+echo "Hello World." | openssl rsautl -encrypt -pubin -inkey sshkeygen.pub.pem  > encrypted.out
+openssl rsautl -decrypt -inkey sshkeygen -in encrypted.out
