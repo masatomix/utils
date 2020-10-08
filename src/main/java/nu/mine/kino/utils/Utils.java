@@ -17,7 +17,6 @@ import static nu.mine.kino.utils.JSONUtils.*;
 
 import java.io.IOException;
 import java.security.KeyManagementException;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
@@ -45,6 +44,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.StatusType;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.glassfish.jersey.apache.connector.ApacheConnectorProvider;
@@ -62,10 +62,6 @@ import com.nimbusds.jwt.SignedJWT;
 
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * @author Masatomi KINO
- * @version $Revision$
- */
 /**
  * @author Masatomi KINO
  * @version $Revision$
@@ -133,13 +129,14 @@ public class Utils {
     }
 
     public static String sha256(String target) {
-        try {
-            MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
-            byte[] digest = sha256.digest(target.getBytes());
-            return Utils.encodeBase64URLSafeString(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
+        return Base64.encodeBase64URLSafeString(DigestUtils.sha256(target));
+//        try {
+//            MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+//            byte[] digest = sha256.digest(target.getBytes());
+//            return Utils.encodeBase64URLSafeString(digest);
+//        } catch (NoSuchAlgorithmException e) {
+//            throw new RuntimeException(e);
+//        }
     }
 
     /**
@@ -163,6 +160,20 @@ public class Utils {
         if (!requestState.equals(sessionState)) {
             throw new ServletException("前回のリクエストと今回のstate値が一致しないため、エラー。");
         }
+    }
+
+    /**
+     * authorization request 時に保存された code_verifierを取り出す。
+     * @param request
+     * @throws ServletException
+     */
+    public static String getCodeVerifier(HttpServletRequest request)
+            throws ServletException {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            throw new ServletException("Bad Request(session is null.)");
+        }
+        return (String) session.getAttribute(SESSION_CODE_VERIFIER);
     }
 
     /**
@@ -229,23 +240,22 @@ public class Utils {
     }
 
     public static String getAccessTokenJSONForPKCE(String oauth_server,
-            String redirect_url, String client_id, String client_secret,
-            String authorizationCode, String code_verifier, Client client)
-            throws ServletException {
+            String redirect_url, String client_id, String authorizationCode,
+            String code_verifier, Client client) throws ServletException {
         return getAccessTokenJSONForPKCE(oauth_server, redirect_url, client_id,
-                client_secret, authorizationCode, code_verifier, client,
+                authorizationCode, code_verifier, client,
                 MediaType.APPLICATION_FORM_URLENCODED_TYPE);
     }
 
     public static String getAccessTokenJSONForPKCE(String oauth_server,
-            String redirect_url, String client_id, String client_secret,
-            String authorizationCode, String code_verifier, Client client,
-            MediaType mediaType) throws ServletException {
+            String redirect_url, String client_id, String authorizationCode,
+            String code_verifier, Client client, MediaType mediaType)
+            throws ServletException {
         String result = null;
 
         Map<String, String> formParams = (Map<String, String>) createMapForPKCE(
-                redirect_url, client_id, client_secret, authorizationCode,
-                code_verifier, client, mediaType);
+                redirect_url, client_id, authorizationCode, code_verifier,
+                client, mediaType);
 
         log.debug("OAuthServer:{}", oauth_server);
         log.debug("MediaType: {}", mediaType);
@@ -271,22 +281,22 @@ public class Utils {
      * 
      * @param redirect_url
      * @param client_id
-     * @param client_secret
      * @param authorizationCode
+     * @param code_verifier
      * @param client
      * @param mediaType
      * @return
      */
     private static Map<String, ?> createMapForPKCE(String redirect_url,
-            String client_id, String client_secret, String authorizationCode,
-            String code_verifier, Client client, MediaType mediaType) {
+            String client_id, String authorizationCode, String code_verifier,
+            Client client, MediaType mediaType) {
 
         String grant_type = "authorization_code";
         MultivaluedMap<String, String> formParams = new MultivaluedHashMap<String, String>();
         formParams.putSingle("redirect_uri", redirect_url);
         formParams.putSingle("grant_type", grant_type);
         formParams.putSingle("client_id", client_id);
-//        formParams.putSingle("client_secret", client_secret);
+        // formParams.putSingle("client_secret", client_secret);
         formParams.putSingle("code", authorizationCode);
         formParams.putSingle("code_verifier", code_verifier);
 
@@ -295,7 +305,7 @@ public class Utils {
             jsonParams.put("redirect_uri", redirect_url);
             jsonParams.put("grant_type", grant_type);
             jsonParams.put("client_id", client_id);
-//            jsonParams.put("client_secret", client_secret);
+            // jsonParams.put("client_secret", client_secret);
             jsonParams.put("code", authorizationCode);
             jsonParams.put("code_verifier", code_verifier);
             return jsonParams;
@@ -362,6 +372,20 @@ public class Utils {
         Client client = ClientBuilder.newClient();
         return getResource(resource_server, accessToken, client);
 
+    }
+
+    public static Map<String, Object> getOpenIdConfiguration(String uri)
+            throws IOException {
+        Client client = ClientBuilder.newClient();
+        return getOpenIdConfiguration(uri, client);
+    }
+
+    public static Map<String, Object> getOpenIdConfiguration(String uri,
+            Client client) throws IOException {
+        Response restResponse = client.target(uri).request().get();
+        String result = restResponse.readEntity(String.class);
+        log.debug(result);
+        return json2Map(result);
     }
 
     /**

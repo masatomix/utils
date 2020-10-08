@@ -10,7 +10,6 @@ package nu.mine.kino;
  * $Id$
  ******************************************************************************/
 
-
 /**
  * @author Masatomi KINO
  * @version $Revision$
@@ -24,4 +23,6 @@ public interface Constants {
     public static final String SESSION_NONCE = "nonce";
 
     public static final String PARAM_NONCE = "nonce";
+
+    public static final String SESSION_CODE_VERIFIER = "code_verifier";
 }
