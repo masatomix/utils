@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>nu.mine.kino</groupId>
 	<artifactId>utils</artifactId>
-	<version>0.1.8</version>
+	<version>0.1.9</version>
 	<name>Utility</name>
 	<url>https://github.com/masatomix/utils</url>
 	<licenses>
@@ -90,12 +90,12 @@
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-databind</artifactId>
-			<version>2.9.10.5</version>
+			<version>2.11.3</version>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-annotations</artifactId>
-			<version>2.7.4</version>
+			<version>2.11.3</version>
 		</dependency>
 		<dependency>
 			<groupId>com.nimbusds</groupId>
