@@ -17,6 +17,7 @@ import static nu.mine.kino.utils.JSONUtils.*;
 
 import java.io.IOException;
 import java.security.KeyManagementException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
@@ -72,7 +73,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class Utils {
     public static String getRandomString() {
-        return RandomStringUtils.randomAlphanumeric(40);
+        return RandomStringUtils.randomAlphanumeric(50);
     }
 
     /**
@@ -129,6 +130,16 @@ public class Utils {
 
     public static String encodeBase64URLSafeString(byte[] binaryData) {
         return Base64.encodeBase64URLSafeString(binaryData);
+    }
+
+    public static String sha256(String target) {
+        try {
+            MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+            byte[] digest = sha256.digest(target.getBytes());
+            return Utils.encodeBase64URLSafeString(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -211,6 +222,82 @@ public class Utils {
             jsonParams.put("client_id", client_id);
             jsonParams.put("client_secret", client_secret);
             jsonParams.put("code", authorizationCode);
+            return jsonParams;
+        }
+        return formParams;
+
+    }
+
+    public static String getAccessTokenJSONForPKCE(String oauth_server,
+            String redirect_url, String client_id, String client_secret,
+            String authorizationCode, String code_verifier, Client client)
+            throws ServletException {
+        return getAccessTokenJSONForPKCE(oauth_server, redirect_url, client_id,
+                client_secret, authorizationCode, code_verifier, client,
+                MediaType.APPLICATION_FORM_URLENCODED_TYPE);
+    }
+
+    public static String getAccessTokenJSONForPKCE(String oauth_server,
+            String redirect_url, String client_id, String client_secret,
+            String authorizationCode, String code_verifier, Client client,
+            MediaType mediaType) throws ServletException {
+        String result = null;
+
+        Map<String, String> formParams = (Map<String, String>) createMapForPKCE(
+                redirect_url, client_id, client_secret, authorizationCode,
+                code_verifier, client, mediaType);
+
+        log.debug("OAuthServer:{}", oauth_server);
+        log.debug("MediaType: {}", mediaType);
+        Response restResponse = client //
+                .target(oauth_server) //
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .post(Entity.entity(formParams, mediaType));
+        result = restResponse.readEntity(String.class);
+        log.debug("result: {}", result);
+        checkAccessTokenResult(restResponse);
+
+        return result;
+    }
+
+    /**
+     * AccessToken取得のためのMapを作成する。Qiitaだけ、
+     * 
+     * <pre>
+     * Content-Type: application/x-www-form-urlencoded
+     * </pre>
+     * 
+     * を受け付けないので、パラメタ生成の処理を分けている。
+     * 
+     * @param redirect_url
+     * @param client_id
+     * @param client_secret
+     * @param authorizationCode
+     * @param client
+     * @param mediaType
+     * @return
+     */
+    private static Map<String, ?> createMapForPKCE(String redirect_url,
+            String client_id, String client_secret, String authorizationCode,
+            String code_verifier, Client client, MediaType mediaType) {
+
+        String grant_type = "authorization_code";
+        MultivaluedMap<String, String> formParams = new MultivaluedHashMap<String, String>();
+        formParams.putSingle("redirect_uri", redirect_url);
+        formParams.putSingle("grant_type", grant_type);
+        formParams.putSingle("client_id", client_id);
+//        formParams.putSingle("client_secret", client_secret);
+        formParams.putSingle("code", authorizationCode);
+        formParams.putSingle("code_verifier", code_verifier);
+
+        if (mediaType.equals(MediaType.APPLICATION_JSON_TYPE)) {
+            Map<String, String> jsonParams = new HashMap<String, String>();
+            jsonParams.put("redirect_uri", redirect_url);
+            jsonParams.put("grant_type", grant_type);
+            jsonParams.put("client_id", client_id);
+//            jsonParams.put("client_secret", client_secret);
+            jsonParams.put("code", authorizationCode);
+            jsonParams.put("code_verifier", code_verifier);
             return jsonParams;
         }
         return formParams;
