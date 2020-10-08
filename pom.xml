@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>nu.mine.kino</groupId>
 	<artifactId>utils</artifactId>
-	<version>0.1.7</version>
+	<version>0.1.8</version>
 	<name>Utility</name>
 	<url>https://github.com/masatomix/utils</url>
 	<licenses>
@@ -40,7 +40,7 @@
 		<jetty.version>9.4.6.v20170531</jetty.version>
 		<maven.compiler.plugin.version>3.6.1</maven.compiler.plugin.version>
 		<maven.war.plugin.version>3.1.0</maven.war.plugin.version>
-		<lombok.version>1.16.2</lombok.version>
+		<lombok.version>1.18.12</lombok.version>
 	</properties>
 	<dependencies>
 		<dependency>
